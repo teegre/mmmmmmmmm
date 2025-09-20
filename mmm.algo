@@ -1132,5 +1132,5 @@ Début
     Sinon
       MachineEcrire(">>> " & JOUEURS[0] & 'a gagné. Sans rancune...')
     FinSi
-    MachineEcrire(">>> Merci de votre visite " & JOUEURS[1] & "! A bientôt !")
+    MachineEcrire(">>> Merci de votre visite " & JOUEURS[1] & ", et à bientôt !")
 Fin
