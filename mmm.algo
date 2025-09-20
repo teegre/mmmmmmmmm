@@ -1,0 +1,1136 @@
+#! /usr/bin/env fralgo
+
+Importer "stdlib" Alias std
+Importer "termlib" Alias term
+
+Constante @PROGRAAMME "MMMMMMMMM, MMM², 9M"
+Constante @AUTEUR     "Stéphane MEYER (Teegre)"
+Constante @VERSION    "0.1"
+Constante @DATE_MOD   "2025/09/20"
+
+Constante COULEURS ["\033[37m", "\033[7m" ]
+
+# Pour vérification des alignements
+Constante LIGNES [     \\
+  [0,1], [3,1], [6,1], \\
+  [0,3], [1,3], [2,3], \\
+  [0,4], [2,2]         \\
+]
+
+Structure Coord4D
+  L1 en Entier
+  L2 en Entier
+  C1 en Entier
+  C2 en Entier
+FinStructure
+
+# Grille principale
+Tableau GRILLEP[2,2] en Entier
+# Grilles 3x3
+Tableau GRILLES[2,2,2,2] en Entier
+# Grilles résolues (victoires ou égalités).
+Tableau GRILLEG[8] en Booléen
+# Coups joués
+Tableau COUPS[] en Entier
+# Sets
+Tableau SETS[2] en Entier
+# Joueurs
+Tableau JOUEURS[1] en Chaîne
+
+# Nom du joueur
+Variable NOMJOUEUR en Chaîne
+# Coup tel qu'entré par l'utilisateur.
+Variable CCOUP en Chaîne
+# Coup converti en Entier.
+Variable COUP en Entier
+# Coordonnées 4D du COUP.
+Variable COORD en Coord4D
+# Emplacement mémoire pour un coup
+Variable MM en Entier
+# Numéro de set, nombres de manches.
+Variables SET, SETMAX en Entier
+# Numéro de tour.
+Variable TOUR en Entier
+# Index du joueur.
+Variables JOUEUR, JOUEURC, GAGNANT en Entier
+# Index du joueur ayant commencé le jeu.
+Variable PREMS en Entier
+
+# Index de la grille dans laquelle le joueur doit placer son coup.
+# Initialisé à -1 pour le premier tour : pas de contrainte de grille.
+Variables INDEX, INDEXC en Entier
+
+# VRAI s'il y a égalité.
+Variable EGALITE en Booléen
+
+# Position du curseur à partir du bord gauche de l'écran.
+# Prend en compte les redimensionnements éventuels du terminal
+# (en différé).
+Variables DC, ODC en Entier
+
+Procédure InitialiseGrilles()
+  Variables i, j, k, l en Entier
+  Pour i ← 0 à 2
+    Pour j ← 0 à 2
+      Pour k ← 0 à 2
+        Pour l ← 0 à 2
+          GRILLES[i,j,k,l] ← -1
+        l Suivant
+      k Suivant
+    j Suivant
+  i Suivant
+  Pour i ← 0 à 2
+    Pour j ← 0 à 2
+      GRILLEP[i,j] ← -1
+    j Suivant
+  i Suivant
+  Pour i ← 0 à 8
+    GRILLEG[i] ← FAUX
+  i Suivant
+FinProcédure
+
+Fonction Inverse(num en Entier) en Entier
+  Variables d, u en Entier
+  Si num > 99 OU num < 11 Alors
+    Panique "Inverse : nombre invalide [" & Chaîne(num) & "]."
+  FinSi
+  d ← num / 10
+  u ← num % 10
+  Retourne u * 10 + d
+FinFonction
+
+Fonction PointCentral(LC en Entier) en Entier
+  # Teegre :
+  # Retourne le numéro de la grille à laquelle appartient
+  # le point aux coordonnées 2D données s'il se trouve au centre
+  # de ladite grille.
+  Variable index en Entier
+  index ← IndexGrille(LC)
+  Si IndexGrille3x3(LC) = 5 Alors
+    Retourne index
+  FinSi
+  Retourne -1
+FinFonction
+
+Fonction Score() en Chaîne
+  # Teegre :
+  # Retourne le score par set. 
+  Variable i en Entier
+  Variable score en Chaîne
+  score ← ""
+  Pour i ← 0 à SETMAX-1
+    Si SETS[i] = 0 Alors
+      score ← score & "O"
+    SinonSi SETS[i] = 1 Alors
+      score ← score & "X"
+    SinonSi SETS[i] = 2 Alors
+      score ← score & "/"
+    Sinon
+      score ← score & "-"
+    FinSi
+    Si i < SETMAX-1 Alors
+      score ← score & " "
+    FinSi
+  i Suivant
+  Retourne score
+FinFonction
+
+Fonction ScoreTexte() en Chaîne
+  Variable score en Chaîne
+  Variables J1, J2, i en Entier
+  J1 ← 0
+  J2 ← 0
+  Pour i ← 0 à SETMAX-1
+    Si SETS[i] = 0 Alors
+      J1 ← J1 + 1
+    SinonSi SETS[i] = 1 Alors
+      J2 ← J2 + 1
+    SinonSi SETS[i] = 2 Alors
+      J1 ← J1 + 1
+      J2 ← J2 + 1
+    FinSi
+  i Suivant
+  Si J1 > J2 OU J2 > J1 Alors
+    Si GAGNANT = 0 Alors
+      score ← Chaîne(J1) & " à " & Chaîne(J2)
+    Sinon
+      score ← Chaîne(J2) & " à " & Chaîne(J1)
+    FinSi
+  SinonSi J1 = J2 ET J1 > 0 Alors
+    score ← Chaîne(J1) & " partout"
+  Sinon
+    score ← "0 partout"
+  FinSi
+
+ Retourne score
+FinFonction
+
+Fonction Set() en Chaîne
+  Si SET = 1 Alors
+    Retourne "1ER"
+  FinSi
+  Retourne Chaîne(SET) & "ÈME"
+FinFonction
+
+Procédure DessineGrille()
+  Variables i, j, k, l en Entier
+  Variable C4D en Coord4D
+  Variable C2D en Entier
+  Variable centre en Entier
+  Variable coup en Entier
+
+  coup ← -1
+
+  Si COUPS Alors
+    coup ← COUPS[Longueur(COUPS)-1]
+  FinSi
+
+  DC ← term:Largeur() / 2 - 30
+  Si DC <> ODC Alors
+    ODC ← DC
+    term:EffaceEcran()
+    RéafficheCoups()
+  FinSi
+
+  term:RappelCur()
+  term:PosCol(DC)
+  Ecrire "   ", Score(), "| Set", Chaîne(SET) & "/" & Chaîne(SETMAX), "Tour", TOUR
+  term:PosCol(DC)
+  Ecrire "    1 2 3   4 5 6   7 8 9"
+  term:PosCol(DC)
+  # ╔ ═ ║ ╗╚ ╝╟ ╢ ╧ ╤
+  Ecrire "  ╔═══════╤═══════╤═══════╗"
+  term:PosCol(DC)
+  Pour i ← 0 à 2
+    Pour j ← 0 à 2
+      Pour k ← 0 à 2
+        Pour l ← 0 à 2
+          Si l = 0 ET k = 0 Alors
+            term:PosCol(DC)
+            Ecrire "", Chaîne((j + 1) + (3 * i)) & "║" \
+          FinSi
+          C4D ← i, j, k, l
+          Si INDEX <> -1 Alors
+            Si FaitPartieGrille(C4D, INDEX) Alors
+              Ecrire term:FBC & term:TNO \
+            FinSi
+          FinSi
+          Ecrire " " \
+          Si GRILLES[i,j,k,l] = 0 Alors
+            # Surligne le dernier coup de l'ordinateur...
+            Si JOUEURC = 0 ET Convertit2D4D(coup) = C4D Alors
+              Ecrire term:TCL \
+            FinSi
+            Ecrire "O" \
+            Si JOUEURC = 0 ET Convertit2D4D(coup) = C4D Alors
+              Ecrire term:TACL \
+            FinSi
+          SinonSi GRILLES[i,j,k,l] = 1 Alors
+            Ecrire "X" \
+          SinonSi GRILLES[i,j,k,l] = 2 Alors
+            Ecrire "/" \
+          Sinon
+            C2D ← Convertit4D2D(C4D)
+            centre ← PointCentral(C2D)
+            Si centre <> -1 Alors
+              Ecrire term:TAT & Chaîne(centre) & term:TAAT \
+            Sinon
+              Ecrire "∙" \
+            FinSi
+          FinSi
+        l Suivant
+        Ecrire " " \
+        Si k < 2 Alors
+          Ecrire term:ANN \
+          Ecrire "│" \
+        FinSi
+      k Suivant
+      Ecrire term:ANN & "║"
+    j Suivant
+  Si i < 2 Alors
+    term:PosCol(DC)
+    Ecrire "  ╟───────┼───────┼───────╢"
+  FinSi
+  i Suivant
+  term:PosCol(DC)
+  Ecrire "  ╚═══════╧═══════╧═══════╝"
+  term:EffaceBE()
+FinProcédure
+
+Fonction Convertit2D4D(LC en Entier) en Coord4D
+  # Teegre :
+  # Convertit des coordonnées 2D en coordonnées 4D :
+  # Dizaines = ligne ; unités = colonne.
+  # 11 → 0,0,0,0
+  # 19 ← 0,0,2,2
+  # 55 → 1,1,1,1
+  # 91 → 2,2,0,0
+  # 99 → 2,2,2,2
+  Variable CC en Coord4D
+  CC ← (LC/10-1)/3, (LC/10-1)%3, (LC%10-1)/3, (LC%10-1)%3
+  Retourne CC
+FinFonction
+
+Fonction Convertit4D2D(C4D en Coord4D) en Entier
+  # Teegre :
+  # Convertit des coordonnées 4D en coordonnées 2D :
+  # 0,0,0,0 → 11
+  # 0,0,2,2 → 19
+  # 0,2,0,1 → 32
+  Variables L, C en Entier
+  L ← C4D.L1 * 3 + C4D.L2 + 1
+  C ← C4D.C1 * 3 + C4D.C2 + 1
+  Retourne L * 10 + C
+FinFonction
+
+Fonction IndexGrille(LC en Entier) en Entier
+  # Teegre :
+  # Détermine l'index (1-9) de la grille principale
+  # selon les coordonnées 2D données en paramètre.
+  Variables GL, GC en Entier
+  GL ← (LC/10-1)/3
+  GC ← (LC%10-1)/3
+  Retourne GL*3+GC+1
+FinFonction
+
+Fonction IndexGrille3x3(LC en Entier) en Entier
+  # Teegre :
+  # Détermine l'index (1-9) de la grille 3x3 selon
+  # les coordonnées 2D données en paramètre.
+  Variables BL, BC en Entier
+  BL ← (LC/10-1)%3
+  BC ← (LC%10-1)%3
+  Retourne BL*3+BC+1
+FinFonction
+
+Procédure Coords2DGrille3x3(&CS2D[8] en Entier, index en Entier)
+  # Teegre :
+  # Retourne les index d'une grille 3x3 selon un index donné.
+  # 1 : 11-33 | 2 : 14-36 | 3 : 17-39 
+  # 4 : 41-63 | 5 : 44-66 | 6 : 47-69 
+  # 7 : 71-93 | 8 : 74-96 | 9 : 77-99 
+  Variables L, C, l, c, I en Entier
+
+  I ← 0
+  L ← (index - 1) / 3
+  C ← (index - 1) % 3
+
+  Pour l ← 1 + L * 3 à L * 3 + 3
+    Pour c ← 1 + C * 3 à C * 3 + 3
+      CS2D[I] ← l * 10 + c
+      I ← I + 1
+    c Suivant
+  l Suivant
+FinProcédure
+
+Fonction FaitPartieGrille(C4D en Coord4D, index en Entier) en Booléen
+  # Teegre :
+  # Retourne VRAI si les coordonnées 4D `C4D` font partie de la grille 3x3
+  # correspondante à l'index donné.
+  Si index = -1 Alors
+    Retourne VRAI
+  FinSi
+  Retourne IndexGrille(Convertit4D2D(C4D)) = index
+FinFonction
+
+Fonction Valide2D(LC en Entier) en Booléen
+  # Teegre :
+  # Retourne VRAI si les coordonnées 2D sont valides.
+  Variable R en Booléen
+  LC ← LC - 11
+  R ← (LC/10/3 > -1) ET (LC/10/3 < 3)
+  R ← R ET (LC%10/3 > -1) ET (LC%10/3 < 3)
+  R ← R ET (LC/10%3 > -1) ET (LC/10%3 < 3)
+  R ← R ET (LC%10%3 > -1) ET (LC%10%3 < 3)
+  Retourne R
+FinFonction
+
+Fonction ValeurGrille(LC en Entier) en Entier
+  # Teegre :
+  # Retourne la valeur stockée à l'emplacement indiqué par les coordonnées 2D `LC`.
+  Variable C4D en Coord4D
+  C4D ← Convertit2D4D(LC)
+  Retourne GRILLES[C4D.L1,C4D.L2,C4D.C1,C4D.C2]
+FinFonction
+
+Fonction CoupEstJoué(LC en Entier) en Booléen
+  # Teegre :
+  # Retourne VRAI si un coup a été placé aux coordonnées `LC`.
+  Variable C4D en Coord4D
+  C4D ← Convertit2D4D(LC)
+  Retourne ValeurGrille(LC) <> -1
+FinFonction
+
+Procédure AjouteCoup()
+  # Teegre :
+  # Ajoute le dernier coup joué à la liste de coups.
+  Redim COUPS[Taille(COUPS)]
+  COUPS[Taille(COUPS)-1] ← COUP
+FinProcédure
+
+Procédure AfficheCoup(index en Entier)
+  # Teegre :
+  # Affiche les coordonnées 2D du dernier coup,
+  # ou affiche les coordonnées 2D du coup à l'index indiqué..
+  Variables l,c en Entier
+  Variables i, lbase, cbase, clargeur en Entier
+  Variables ln, cn en Entier
+  Variable joueur en Entier
+
+  Si NON(COUPS) Alors
+    Terminer
+  FinSi
+
+  # Index du dernier coup.
+  Si index <> -1 Alors
+    i ← index
+  Sinon
+    i ← Longueur(COUPS) - 1
+  FinSi
+
+  # Ligne de base.
+  lbase ← 3
+  # Colonne de base.
+  cbase ← 30
+  # Largeur d'une colonne
+  clargeur ← 4
+
+  # Numéro de ligne.
+  ln ← i % 13
+  # Numéro de colonne.
+  cn ← i / 13
+
+  # Ligne.
+  l ← lbase + ln
+  # Colonne.
+  c ← cbase + cn * clargeur
+
+  joueur ← (PREMS + i) % 2
+
+  term:PosEcrire(l,DC+c, COULEURS[joueur] & "▶" & Chaîne(COUPS[i]) & term:ANN)
+FinProcédure
+
+Procédure RéafficheCoups()
+  # Teegre :
+  # Réaffiche tous les coups précédents en prenant en compte
+  # le joueur qui l'a joué.
+  Variable i en Entier
+  Pour i ← 0 à Longueur(COUPS) - 1
+    AfficheCoup(i)
+  i Suivant
+FinProcédure
+
+Procédure CoupsPossibles(&CP2D[], index en Entier)
+  # Teegre :
+  # Remplit le tableau `CP2D` avec les coodonnées 2D coups
+  # des coups possibles selon un index de grille donné.
+  Tableau CS2D[8] en Entier
+  Variable i en Entier
+
+  Coords2DGrille3x3(CS2D, index)
+
+  Pour i ← 0 à 8
+    Si NON(CoupEstJoué(CS2D[i])) Alors
+      Redim CP2D[Taille(CP2D)]
+      CP2D[Taille(CP2D)-1] ← CS2D[i]
+    FinSi
+  i Suivant
+FinProcédure
+
+Fonction PlaceCoupJoueur() en Booléen
+  # Teegre :
+  # Retourne VRAI si le joueur a entré des coordonnées 2D valides.
+  Tableau Coups[] en Entier
+  Variables coup, i en Entier
+  Variable coups en Booléen
+
+  AfficheCoup(-1)
+  DessineGrille()
+
+  term:MontreCur()
+  term:PosCol(DC)
+  Ecrire "LC> " \
+  Lire CCOUP
+  term:CacheCur()
+
+  Si NON(CCOUP) Alors
+    Retourne FAUX
+  FinSi
+
+  Si NON(std:EstNum(CCOUP)) Alors
+    term:PosCol(DC)
+    EcrireErr term:TRO & "*** Les coordonnées sont invalides,", JOUEURS[1] & term:ANN \
+    Dormir(1.5)
+    Retourne FAUX
+  FinSi
+
+  COUP ← Entier(CCOUP)
+  Si NON(Valide2D(COUP)) Alors
+    term:PosCol(DC)
+    EcrireErr term:TRO & "*** Les coordonnées sont invalides,", JOUEURS[1] & term:ANN \
+    Dormir(1.5)
+    Retourne FAUX
+  FinSi
+
+  Si INDEX <> -1 Alors
+    Si NON(FaitPartieGrille(Convertit2D4D(COUP), INDEX)) Alors
+      coup ← Inverse(COUP)
+      CoupsPossibles(Coups, INDEX)
+
+      term:PosCol(DC)
+      EcrireErr term:TRO & "***", JOUEURS[1] & "," , "les coordonnées sont en dehors de la grille " & Chaîne(INDEX) & "." & term:ANN
+      Si std:TContient(Coups, coup) Alors
+        term:PosCol(DC)
+        EcrireErr term:TVE & "--- Vouliez-vous dire", coup, "?" & term:ANN \
+      Sinon
+        coups ← FAUX
+        term:PosCol(DC)
+        EcrireErr term:TVE & "--- Essayez l'un des coups suivants : "
+        term:PosCol(DC)
+        EcrireErr "---", "" \
+        Pour i ← 0 à Longueur(Coups) - 1
+          Si (Coups[i] / 10 = COUP / 10) OU (Coups[i] % 10 = COUP % 10) Alors
+            EcrireErr Chaîne(Coups[i]), "" \
+            coups ← VRAI
+          FinSi
+        i Suivant
+        Si NON(coups) Alors
+          term:PosCol(DC)
+          EcrireErr "---", "" \
+          Pour i ← 0 à Longueur(Coups) - 1
+            Si i > 0 ET i DP 3 Alors
+              EcrireErr ""
+              term:PosCol(DC)
+              EcrireErr "---", "" \
+            FinSi
+            EcrireErr Chaîne(Coups[i]), "" \
+          i Suivant
+        FinSi
+        EcrireErr term:ANN \
+      FinSi
+      Dormir(3)
+      Retourne FAUX
+    FinSi
+  FinSi
+
+  Si EstGagnée(IndexGrille(COUP)) Alors
+    term:PosCol(DC)
+    EcrireErr term:TRO & '*** Les coordonnées se situent dans une grille déjà terminée', JOUEURS[1] & term:ANN \
+    Dormir(1.5)
+    Retourne FAUX
+  FinSi
+
+  Si CoupEstJoué(COUP) Alors
+    term:PosCol(DC)
+    EcrireErr term:TRO & "*** Ce coup a déjà été joué." & term:ANN \
+    Dormir(1.5)
+    Retourne FAUX
+  FinSi
+  
+  EcrireFichier 1, "### JOUEUR joue " & Chaîne(COUP)
+  Retourne VRAI
+FinFonction
+
+Procédure JoueTemp(coup, joueur en Entier)
+  Variable C4D en Coord4D
+  C4D ← Convertit2D4D(coup)
+  MM ← GRILLES[C4D.L1,C4D.L2,C4D.C1,C4D.C2]
+  GRILLES[C4D.L1,C4D.L2,C4D.C1,C4D.C2] ← joueur
+FinProcédure
+
+Procédure AnnuleTemp(coup en Entier)
+  Variable C4D en Coord4D
+  C4D ← Convertit2D4D(coup)
+  GRILLES[C4D.L1,C4D.L2,C4D.C1,C4D.C2] ← MM
+FinProcédure
+
+Fonction ChercheCoupGagnant(CS2D[8] en Entier, joueur en Entier) en Entier
+  Variables i, coup en Entier
+  Pour i ← 0 à 8
+    coup ← CS2D[i]
+    Si NON(CoupEstJoué(coup)) Alors
+      JoueTemp(coup, joueur)
+      Si VérifieGagnantGrille(joueur, IndexGrille(coup), VRAI) Alors
+        AnnuleTemp(coup)
+        Retourne coup
+      FinSi
+      AnnuleTemp(coup)
+    FinSi
+  i Suivant
+  Retourne -1
+FinFonction
+
+Fonction BloqueAdversaire(CS2D[8] en Entier, joueur en Entier) en Entier
+  Variables i, coup en Entier
+  Pour i ← 0 à 8
+    coup ← CS2D[i]
+    Si NON(CoupEstJoué(coup)) Alors
+      JoueTemp(coup, 1 - joueur)
+      Si VérifieGagnantGrille(1 - joueur, IndexGrille(coup), VRAI) Alors
+        AnnuleTemp(coup)
+        Retourne coup
+      FinSi
+      AnnuleTemp(coup)
+    FinSi
+  i Suivant
+  Retourne -1
+FinFonction
+
+Fonction RechercheGrilleAvantageuse(joueur en Entier) en Entier
+  Tableaux Grilles[8], CS2D[8] en Entier
+  Variable index en Entier
+
+  Grilles ← [1,2,3,4,5,6,7,8,9]
+  std:Mélanger(Grilles)
+
+  Pour index ← 0 à 8
+    Si EstGagnée(Grilles[index]) Alors
+      Continuer
+    FinSi
+    Coords2DGrille3x3(CS2D, Grilles[index])
+    EcrireFichier 1, CS2D
+    Si ChercheCoupGagnant(CS2D, joueur) <> -1 Alors
+      Retourne Grilles[index]
+    FinSi
+    Si BloqueAdversaire(CS2D, joueur) <> -1 Alors
+      Retourne Grilles[index]
+    FinSi 
+  index Suivant
+  Retourne -1
+FinFonction
+
+Fonction AligneDeuxSansAdversaire(coup, joueur en Entier) en Booléen
+  Tableau CS2D[8] en Entier
+  Variable index en Entier
+  Variables k, a, b, c en Entier
+  Variable condition en Booléen
+
+  index ← IndexGrille3x3(coup)
+  Coords2DGrille3x3(CS2D, index)
+
+  JoueTemp(coup, joueur)
+
+  Pour k ← 0 à 7
+    a ← CS2D[LIGNES[k,0]]
+    b ← CS2D[LIGNES[k,0] + LIGNES[k,1]]
+    c ← CS2D[LIGNES[k,0] + 2 * LIGNES[k,1]]
+
+    condition ← ValeurGrille(a) = joueur ET ValeurGrille(b) = joueur ET ValeurGrille(c) = -1
+    condition ← condition OU (ValeurGrille(a) = joueur ET ValeurGrille(b) = -1 ET ValeurGrille(c) = joueur)
+    condition ← condition OU (ValeurGrille(a) = -1 ET ValeurGrille(b) = joueur ET ValeurGrille(c) = joueur)
+    Si condition Alors
+      AnnuleTemp(coup)
+      Retourne VRAI
+    FinSi
+  k Suivant
+
+  AnnuleTemp(coup)
+  Retourne FAUX
+FinFonction
+
+Fonction CoupEstGagnant(coup, joueur en Entier) en Booléen
+  JoueTemp(coup, joueur)
+  Si VérifieGagnantGrille(joueur, IndexGrille(coup), VRAI) Alors
+    AnnuleTemp(coup)
+    Retourne VRAI
+  FinSi
+  AnnuleTemp(coup)
+  Retourne FAUX
+FinFonction
+
+Fonction CoupBloqueAdversaire(coup, joueur en Entier) en Booléen
+  JoueTemp(coup, 1 - joueur)
+  Si VérifieGagnantGrille(1 - joueur, IndexGrille(coup), VRAI) Alors
+    AnnuleTemp(coup)
+    Retourne VRAI
+  FinSi
+  AnnuleTemp(coup)
+  Retourne FAUX
+FinFonction
+
+Fonction EvalueCoup(coup, joueur en Entier) en Entier
+  Tableau CS2D[8] en Entier
+  Tableau futurs[8] en Entier
+  Variables score, indexfutur en Entier
+
+  score ← 0
+
+  Coords2DGrille3x3(CS2D, INDEX)
+
+  # Victoire Immédiate.
+  Si CoupEstGagnant(coup, joueur) Alors
+    EcrireFichier 1, Chaîne(coup) & " gagnant ! +1000"
+    score ← score + 1000
+  FinSi
+
+  Si CoupBloqueAdversaire(coup, joueur) Alors
+    EcrireFichier 1, Chaîne(coup) & " bloque ! +750"
+   score ← score + 750
+  FinSi
+
+  Si AligneDeuxSansAdversaire(coup, joueur) Alors
+    EcrireFichier 1, Chaîne(coup) & " aligne ! +250"
+    score ← score + 250
+  FinSi
+
+  indexfutur ← IndexGrille3x3(coup)
+
+  Coords2DGrille3x3(futurs, indexfutur)
+
+  Si ChercheCoupGagnant(futurs, 1 - joueur) <> -1 Alors
+    EcrireFichier 1, Chaîne(coup) & " attention ! -500"
+   score ← score - 500
+  FinSi
+
+  Si EstGagnée(indexfutur) Alors
+    EcrireFichier 1, Chaîne(coup) & " attention liberté ! -50"
+    score ← score - 50
+  FinSi
+
+  Retourne score
+FinFonction
+
+Procédure PlaceCoupOrdinateur()
+  Tableaux CS2D[8], candidats[], futurs[8] en Entier
+  Variables i, coup, indexfutur en Entier
+  Variables score, meilleur, scoremax en Entier
+
+  AfficheCoup(-1)
+  DessineGrille()
+
+  term:PosCol(DC)
+  EcrireErr ">>>", JOUEURS[0], "réfléchit...", "" \
+
+  EcrireFichier 1, "GRILLE " & Chaîne(INDEX)
+
+  Si INDEX = -1 Alors
+    EcrireFichier 1, "Choix de la grille."
+    INDEX ← RechercheGrilleAvantageuse(0)
+    Si INDEX = -1 Alors
+      INDEX ← Entier(Aléa() * 9 + 1)
+      TantQue EstGagnée(INDEX)
+        INDEX ← Entier(Aléa() * 9 + 1)
+      FinTantQue
+      EcrireFichier 1, "Grille aléatoire : " & Chaîne(INDEX)
+    Sinon
+      EcrireFichier 1, "Grille avantageuse : " & Chaîne(INDEX)
+    FinSi
+  FinSi
+
+  # Obtenir la liste des coups possibles dans la grille
+
+  CoupsPossibles(candidats, INDEX)
+  std:Mélanger(candidats)
+
+  EcrireFichier 1, "*** Evaluation :"
+  EcrireFichier 1, "Coup -> score"
+
+  meilleur ← -1
+  scoremax ← -999
+  Si Taille(candidats) > 0 Alors
+    Pour i ← 0 à Longueur(candidats) - 1
+      score ← EvalueCoup(candidats[i], 0)
+      Si score > scoremax Alors
+        scoremax ← score
+        meilleur ← candidats[i]
+      FinSi
+      EcrireFichier 1, Chaîne(candidats[i]) & " -> " & Chaîne(score)
+    i Suivant
+  FinSi
+
+  EcrireFichier 1, "Fin évaluation ***"
+
+  COUP ← meilleur
+
+  EcrireFichier 1, "Coup sélectionné (E): " & Chaîne(COUP)
+
+FinProcédure
+
+Procédure MarqueGrillePrincipale(égalité en Booléen)
+  # Teegre :
+  # Marque la grille courante comme gagnée.
+  Tableau CS2D[8] en Entier
+  Variables L, C, i en Entier
+  Variable C4D en Coord4D
+
+
+  L ← (INDEXC - 1) / 3
+  C ← (INDEXC - 1) % 3
+  Si égalité Alors
+    GRILLEP[L,C] ← 2
+  Sinon
+    GRILLEP[L,C] ← JOUEURC
+  FinSi
+
+  Si NON(égalité) Alors
+    Coords2DGrille3x3(CS2D, INDEXC)
+    Pour i ← 0 à 8
+      C4D ← Convertit2D4D(CS2D[i])
+      GRILLES[C4D.L1,C4D.L2,C4D.C1,C4D.C2] ← JOUEURC
+    i Suivant 
+  FinSi
+FinProcédure
+
+Fonction VérifieEgalité() en Booléen
+  Variable égalité en Booléen
+  Variables i, j en Entier
+  égalité ← VRAI
+  Pour i ← 0 à 2
+    Pour j ← 0 à 2
+      égalité ← égalité ET GRILLEP[i,j] <> -1
+    j Suivant
+  i Suivant
+
+  Si égalité Alors
+    EGALITE ← égalité
+  FinSi
+
+  Retourne égalité
+FinFonction
+
+Fonction SetJoués() en Entier
+  Variables c, i en Entier
+  c ← 0
+  Pour i ← 0 à SETMAX-1
+    Si SETS[i] <> -1 Alors
+      c ← c + 1
+    FinSi
+  i Suivant
+  Retourne c
+FinFonction
+
+Fonction VérifieGagnantMatch() en Booléen
+  # Teegre :
+  # 2 sets gagnants
+  Variables J1, J2, i en Entier
+
+  J1 ← 0
+  J2 ← 0
+
+  Pour i ← 0 à SETMAX-1
+    Si SETS[i] = 0 Alors
+      J1 ← J1 + 1
+    SinonSi SETS[i] = 1 Alors
+      J2 ← J2 + 1
+    SinonSi SETS[i] = 2 Alors
+      J1 ← J1 + 1
+      J2 ← J2 + 1
+    FinSi
+  i Suivant
+
+  Si J1 = 0 ET J2 = 0 Alors
+    Retourne FAUX
+  FinSi
+
+  # 2 victoires pour l'un des joueurs.
+  Si J1 >= 2 ET J1 > J2 Alors
+    GAGNANT ← 0
+    Retourne VRAI
+  FinSi
+  Si J2 >= 2 ET J2 > J1 Alors
+    GAGNANT ← 1
+    Retourne VRAI
+  FinSi
+
+  # Au moins 3 manches jouées
+  Si SetJoués() = SETMAX Alors
+    Si J1 > J2 Alors
+      GAGNANT ← 0
+      Retourne VRAI
+    FinSi
+    Si J2 > J1 Alors
+      GAGNANT ← 1
+      Retourne VRAI
+    FinSi
+    Redim SETS[SETMAX]
+    SETS[SETMAX] ← -1
+    SETMAX ← SETMAX + 1
+    Retourne FAUX
+  FinSi
+
+  Retourne FAUX
+FinFonction
+
+Fonction VérifieGagnantSet() en Booléen
+  Variables i, j en Entier
+  Variable égalité en Booléen
+  # LIGNES
+  Si GRILLEP[0,0] = JOUEURC ET GRILLEP[0,1] = JOUEURC ET GRILLEP[0,2] = JOUEURC Alors
+    Retourne VRAI
+  FinSi
+  Si GRILLEP[1,0] = JOUEURC ET GRILLEP[1,1] = JOUEURC ET GRILLEP[1,2] = JOUEURC Alors
+    Retourne VRAI
+  FinSi
+  Si GRILLEP[2,0] = JOUEURC ET GRILLEP[2,1] = JOUEURC ET GRILLEP[2,2] = JOUEURC Alors
+    Retourne VRAI
+  FinSi
+  # COLOGNES
+  Si GRILLEP[0,0] = JOUEURC ET GRILLEP[1,0] = JOUEURC ET GRILLEP[2,0] = JOUEURC Alors
+    Retourne VRAI
+  FinSi
+  Si GRILLEP[0,1] = JOUEURC ET GRILLEP[1,1] = JOUEURC ET GRILLEP[2,1] = JOUEURC Alors
+    Retourne VRAI
+  FinSi
+  Si GRILLEP[0,2] = JOUEURC ET GRILLEP[1,2] = JOUEURC ET GRILLEP[2,2] = JOUEURC Alors
+    Retourne VRAI
+  FinSi
+  # DIAGOGNIALES
+  Si GRILLEP[0,0] = JOUEURC ET GRILLEP[1,1] = JOUEURC ET GRILLEP[2,2] = JOUEURC Alors
+    Retourne VRAI
+  FinSi
+  Si GRILLEP[0,2] = JOUEURC ET GRILLEP[1,1] = JOUEURC ET GRILLEP[2,0] = JOUEURC Alors
+    Retourne VRAI
+  FinSi
+
+  Retourne FAUX
+FinFonction
+
+Fonction EstGagnée(index en Entier) en Booléen
+  Si index = -1 Alors
+    Retourne FAUX
+  FinSi
+  Retourne GRILLEG[index - 1]
+FinFonction
+
+Fonction VérifieGagnantGrille(joueur, index en Entier, simulation en Booléen) en Booléen
+  # Teegre :
+  # Vérifie si le joueur courant a gagné le jeu de la grille 3x3 (1)
+  # et le jeu de la grille principale (2).
+  # (1) Marque GRILLEP avec l'index du joueur courant.
+  Tableau CS2D[8] en Entier
+  Variable C4D en Coord4D
+  Variables k, a, b, c, égalité en Entier
+  Variable condition en Booléen
+
+  Si index = -1 Alors
+    Retourne FAUX
+  FinSi
+
+  Coords2DGrille3x3(CS2D, index)
+
+  Pour k ← 0 à 7
+    a ← CS2D[LIGNES[k,0]]
+    b ← CS2D[LIGNES[k,0] + LIGNES[k,1]]
+    c ← CS2D[LIGNES[k,0] + 2 * LIGNES[k,1]]
+    condition ← ValeurGrille(a) = joueur ET ValeurGrille(b) = joueur ET ValeurGrille(c) = joueur
+    Si condition Alors
+      Si simulation Alors
+        Retourne VRAI
+      FinSi
+      GRILLEG[INDEXC - 1] ← VRAI
+      MarqueGrillePrincipale(FAUX)
+      Retourne VérifieGagnantSet()
+    FinSi
+  k Suivant
+
+  # Vérifie si égalité...
+  égalité ← VRAI
+  Pour k ← 0 à 8
+    égalité ← égalité ET ValeurGrille(CS2D[k]) <> -1
+  k Suivant
+
+  Si égalité Alors
+    Si simulation Alors
+      Retourne VRAI
+    FinSi
+    GRILLEG[index - 1] ← VRAI
+    MarqueGrillePrincipale(VRAI)
+
+    DessineGrille()
+    Pour k ← 0 à 8
+      C4D ← Convertit2D4D(CS2D[k])
+      GRILLES[C4D.L1,C4D.L2,C4D.C1,C4D.C2] ← 2
+    k Suivant
+    Retourne FAUX
+  FinSi
+
+  Retourne FAUX
+FinFonction
+
+Procédure DéterminePrems()
+  # Teegre :
+  # Pile ou face afin de déterminer qui placera le premier coup.
+  Si SET = 0 Alors
+    Si Aléa() > 0.5 Alors
+      JOUEUR ← 1
+    Sinon
+      JOUEUR ← 0
+    FinSi
+    PREMS ← JOUEUR
+  Sinon
+    JOUEUR ← 1 - PREMS
+    PREMS ← JOUEUR
+  FinSi
+FinProcédure
+
+Procédure JoueurSuivant()
+  JOUEUR ← 1 - JOUEUR
+FinProcédure
+
+Fonction GénèreNomJoueur() en Chaîne
+  Constante SYLLABES [              \\
+    "ka", "ki",  "ku",  "ke", "ko", \\
+    "sa", "shi", "su",  "se", "so", \\
+    "ta", "chi", "tsu", "te", "to", \\
+    "ha", "hi",  "fu",  "he", "ho", \\
+    "ma", "mi",  "mu",  "me", "mo", \\
+    "ya", "yu",  "yo",              \\
+    "la", "li",  "lu",  "le", "lo", \\
+    "ra", "ri",  "ru",  "re", "ro", \\
+    "wa", "wi",  "we",  "wo",       \\
+    "ja", "ju",  "jo",              \\
+    "za", "zu",  "zo"               \\
+  ]
+  Constante FINS [                            \\
+    "al", "am", "an", "as", "ax",             \\
+    "el", "em", "en", "es", "et", "ex",       \\
+    "ia", "il", "im", "in", "ir", "is", "ix", \\
+    "or", "os", "ox",                         \\
+    "ur", "us", "ut",                         \\
+    "-san", "-sama", "-chan"                  \\
+  ]
+
+  Variables nb, i en Entier
+  Variable nom en Chaîne
+
+  nb ← Entier(Aléa() * 2 + 2)
+
+  nom ← ""
+  Pour i ← 1 à nb
+    nom ← nom & SYLLABES[Entier(Aléa() * Longueur(SYLLABES))]
+  i Suivant
+  Si Aléa() > 0.5 Alors
+    nom ← nom & FINS[Entier(Aléa() * Longueur(FINS))]
+  FinSi
+
+  nom ← std:Capitaliser(nom)
+
+  Retourne nom
+FinFonction
+
+Procédure MachineEcrire(message en Chaîne)
+  Variable i en Entier
+  Pour i ← 1 à Longueur(message)
+    Ecrire Extraire(message, i, 1) \
+    Dormir(0.00625)
+  i Suivant
+  Ecrire ""
+FinProcédure
+
+Début
+  Ecrire @PROGRAAMME, "version", @VERSION
+  MachineEcrire(">>> Bienvenue !")
+  Dormir(0.5)
+  MachineEcrire(">>> Eh ?")
+  Dormir(0.5)
+  MachineEcrire(">>> Je vous ai déjà vu quelque part...")
+  Dormir(0.5)
+  MachineEcrire(">>> Mais oui !")
+  Dormir(0.75)
+
+  NOMJOUEUR ← GénèreNomJoueur()
+  JOUEURS ← term:TGR & GénèreNomJoueur() & term:TAGR, term:TGR & NOMJOUEUR & term:TAGR
+
+  MachineEcrire(">>> Bonjour " & JOUEURS[1] & " !")
+  Dormir(1.5)
+  MachineEcrire(">>> Je vous présente votre adversaire : " & JOUEURS[0])
+  Dormir(1.5)
+  MachineEcrire(">>> Le jeu va bientôt commencer...")
+  Dormir(3)
+  MachineEcrire(">>> Début...")
+
+  term:SauveEcran()
+  SET ← 0
+  SETMAX ← 2
+  SETS ← -1,-1,-1
+  GAGNANT ← -1
+  ODC ← 0
+
+  Ouvrir "mmm.log" sur 1 en Ecriture
+  
+  # *** Boucle principale... (Match)
+  TantQue NON(VérifieGagnantMatch())
+    DéterminePrems()
+    JOUEURC ← -1
+    SET ← SET + 1
+    term:EffaceEcran()
+    term:SauveCur()
+    TOUR ← 1
+    EGALITE ← FAUX
+    INDEX ← -1
+    INDEXC ← -1
+    Redim COUPS[-1]
+    InitialiseGrilles(GRILLES)
+
+      # *** Boucle secondaire... (Set)
+      TantQue NON(VérifieGagnantGrille(JOUEURC, INDEXC, FAUX))
+        term:CacheCur()
+        Si VérifieEgalité() Alors
+          Sortir
+        FinSi
+        Si EstGagnée(INDEX) Alors
+          INDEX ← -1
+        FinSi
+        Si JOUEUR = 0 Alors
+          PlaceCoupOrdinateur()
+        SinonSi JOUEUR = 1 Alors
+          TantQue NON(PlaceCoupJoueur())
+            Dormir(0.5)
+          FinTantQue
+        FinSi
+
+        COORD ← Convertit2D4D(COUP)
+
+        GRILLES[COORD.L1, COORD.L2, COORD.C1, COORD.C2] ← JOUEUR
+        AjouteCoup()
+        TOUR ← TOUR + JOUEUR
+        INDEXC ← IndexGrille(COUP)
+        INDEX ← IndexGrille3x3(COUP)
+        JOUEURC ← JOUEUR
+        JoueurSuivant()
+      FinTantQue
+
+      INDEX ← -1
+      AfficheCoup(-1)
+      DessineGrille()
+      Dormir(1)
+      Si NON(EGALITE) Alors
+        term:PosCol(DC)
+        Ecrire JOUEURS[JOUEURC], "gagne le", Set(),"set !" & term:ANN
+        SETS[SET-1] ← JOUEURC
+        term:PosCol(DC)
+        Ecrire "Le score est de", ScoreTexte()
+      Sinon
+        term:PosCol(DC)
+        Ecrire "Égalité"
+        SETS[SET-1] ← 2
+        term:PosCol(DC)
+        Ecrire "Le score est de", ScoreTexte()
+      FinSi
+      Si NON(VérifieGagnantMatch()) Alors
+        term:PosCol(DC)
+        Ecrire "Le set suivant va débuter..."
+      FinSi
+      Dormir(3)
+    FinTantQue
+    term:EffaceEcran()
+    RéafficheCoups()
+    DessineGrille()
+    term:PosCol(DC)
+    Ecrire JOUEURS[GAGNANT], "gagne le match", ScoreTexte(), "!"
+    Si GAGNANT = 1 Alors
+      term:PosCol(DC)
+      Ecrire "Félicitations !"
+    FinSi
+    Dormir(3)
+    Fermer 1
+    term:MontreCur()
+    term:RestaureEcran()
+    MachineEcrire(">>> Fin.")
+    Si GAGNANT = 1 Alors
+      MachineEcrire(">>> Vous avez gagné, c'est super.")
+    Sinon
+      MachineEcrire(">>> " & JOUEURS[0] & 'a gagné. Sans rancune...')
+    FinSi
+    MachineEcrire(">>> Merci de votre visite " & JOUEURS[1] & "! A bientôt !")
+Fin
