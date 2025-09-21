@@ -1,12 +1,13 @@
 #! /usr/bin/env fralgo
 
 Importer "stdlib" Alias std
+Importer "datelib" Alias dt
 Importer "termlib" Alias term
 
-Constante @PROGRAAMME "MMMMMMMMM, MMM², 9M"
+Constante @PROGRAAMME "MMMMMMMMM"
 Constante @AUTEUR     "Stéphane MEYER (Teegre)"
 Constante @VERSION    "0.1"
-Constante @DATE_MOD   "2025/09/20"
+Constante @DATE_MOD   "2025/09/21"
 
 Constante COULEURS ["\033[37m", "\033[7m" ]
 
@@ -24,28 +25,28 @@ Structure Coord4D
   C2 en Entier
 FinStructure
 
-# Grille principale
+# Grille principale.
 Tableau GRILLEP[2,2] en Entier
-# Grilles 3x3
+# Grilles 3x3.
 Tableau GRILLES[2,2,2,2] en Entier
 # Grilles résolues (victoires ou égalités).
 Tableau GRILLEG[8] en Booléen
-# Coups joués
+# Coups joués.
 Tableau COUPS[] en Entier
-# Sets
+# Sets.
 Tableau SETS[2] en Entier
-# Joueurs
+# Joueurs.
 Tableau JOUEURS[1] en Chaîne
 
-# Nom du joueur
-Variable NOMJOUEUR en Chaîne
+# Nom des joueurs.
+Variables NOMJOUEUR0, NOMJOUEUR1 en Chaîne
 # Coup tel qu'entré par l'utilisateur.
 Variable CCOUP en Chaîne
 # Coup converti en Entier.
 Variable COUP en Entier
 # Coordonnées 4D du COUP.
 Variable COORD en Coord4D
-# Emplacement mémoire pour un coup
+# Emplacement mémoire pour un coup (simulation).
 Variable MM en Entier
 # Numéro de set, nombres de manches.
 Variables SET, SETMAX en Entier
@@ -67,6 +68,10 @@ Variable EGALITE en Booléen
 # Prend en compte les redimensionnements éventuels du terminal
 # (en différé).
 Variables DC, ODC en Entier
+
+# Durée de la partie.
+Variables heuredeb, heurefin en Numérique
+Variable duréematch en Entier
 
 Procédure InitialiseGrilles()
   Variables i, j, k, l en Entier
@@ -447,6 +452,11 @@ Fonction PlaceCoupJoueur() en Booléen
   AfficheCoup(-1)
   DessineGrille()
 
+  Si TOUR = 1 ET PREMS = 1 Alors
+    term:PosCol(DC)
+    EcrireErr ">>>", JOUEURS[1] & ",", "à vous de jouer."
+  FinSi
+
   term:MontreCur()
   term:PosCol(DC)
   Ecrire "LC> " \
@@ -459,7 +469,7 @@ Fonction PlaceCoupJoueur() en Booléen
 
   Si NON(std:EstNum(CCOUP)) Alors
     term:PosCol(DC)
-    EcrireErr term:TRO & "*** Les coordonnées sont invalides,", JOUEURS[1] & term:ANN \
+    EcrireErr term:TRO & "*** Le coup est invalide,", JOUEURS[1] & "." & term:ANN \
     Dormir(1.5)
     Retourne FAUX
   FinSi
@@ -467,7 +477,7 @@ Fonction PlaceCoupJoueur() en Booléen
   COUP ← Entier(CCOUP)
   Si NON(Valide2D(COUP)) Alors
     term:PosCol(DC)
-    EcrireErr term:TRO & "*** Les coordonnées sont invalides,", JOUEURS[1] & term:ANN \
+    EcrireErr term:TRO & "*** Le coup est invalide,", JOUEURS[1] & term:ANN \
     Dormir(1.5)
     Retourne FAUX
   FinSi
@@ -478,7 +488,9 @@ Fonction PlaceCoupJoueur() en Booléen
       CoupsPossibles(Coups, INDEX)
 
       term:PosCol(DC)
-      EcrireErr term:TRO & "***", JOUEURS[1] & "," , "les coordonnées sont en dehors de la grille " & Chaîne(INDEX) & "." & term:ANN
+      EcrireErr term:TRO & "***", JOUEURS[1] & ","
+      term:PosCol(DC)
+      EcrireErr "    vous devez jouer dans la grille " & Chaîne(INDEX) & "." & term:ANN
       Si std:TContient(Coups, coup) Alors
         term:PosCol(DC)
         EcrireErr term:TVE & "--- Vouliez-vous dire", coup, "?" & term:ANN \
@@ -527,7 +539,7 @@ Fonction PlaceCoupJoueur() en Booléen
     Retourne FAUX
   FinSi
   
-  EcrireFichier 1, "### JOUEUR joue " & Chaîne(COUP)
+  # EcrireFichier 1, "### JOUEUR joue " & Chaîne(COUP)
   Retourne VRAI
 FinFonction
 
@@ -588,7 +600,7 @@ Fonction RechercheGrilleAvantageuse(joueur en Entier) en Entier
       Continuer
     FinSi
     Coords2DGrille3x3(CS2D, Grilles[index])
-    EcrireFichier 1, CS2D
+    # EcrireFichier 1, CS2D
     Si ChercheCoupGagnant(CS2D, joueur) <> -1 Alors
       Retourne Grilles[index]
     FinSi
@@ -659,17 +671,17 @@ Fonction EvalueCoup(coup, joueur en Entier) en Entier
 
   # Victoire Immédiate.
   Si CoupEstGagnant(coup, joueur) Alors
-    EcrireFichier 1, Chaîne(coup) & " gagnant ! +1000"
+    # EcrireFichier 1, Chaîne(coup) & " gagnant ! +1000"
     score ← score + 1000
   FinSi
 
   Si CoupBloqueAdversaire(coup, joueur) Alors
-    EcrireFichier 1, Chaîne(coup) & " bloque ! +750"
+    # EcrireFichier 1, Chaîne(coup) & " bloque ! +750"
    score ← score + 750
   FinSi
 
   Si AligneDeuxSansAdversaire(coup, joueur) Alors
-    EcrireFichier 1, Chaîne(coup) & " aligne ! +250"
+    # EcrireFichier 1, Chaîne(coup) & " aligne ! +250"
     score ← score + 250
   FinSi
 
@@ -678,12 +690,12 @@ Fonction EvalueCoup(coup, joueur en Entier) en Entier
   Coords2DGrille3x3(futurs, indexfutur)
 
   Si ChercheCoupGagnant(futurs, 1 - joueur) <> -1 Alors
-    EcrireFichier 1, Chaîne(coup) & " attention ! -500"
+    # EcrireFichier 1, Chaîne(coup) & " attention ! -500"
    score ← score - 500
   FinSi
 
   Si EstGagnée(indexfutur) Alors
-    EcrireFichier 1, Chaîne(coup) & " attention liberté ! -50"
+    # EcrireFichier 1, Chaîne(coup) & " attention liberté ! -50"
     score ← score - 50
   FinSi
 
@@ -699,21 +711,26 @@ Procédure PlaceCoupOrdinateur()
   DessineGrille()
 
   term:PosCol(DC)
-  EcrireErr ">>>", JOUEURS[0], "réfléchit...", "" \
+  EcrireErr ">>>", JOUEURS[0], "" \
+  Si TOUR = 1 ET PREMS = 0 Alors
+    EcrireErr "commence..." \
+  Sinon
+    EcrireErr "réfléchit..." \
+  FinSi
 
-  EcrireFichier 1, "GRILLE " & Chaîne(INDEX)
+  # EcrireFichier 1, "GRILLE " & Chaîne(INDEX)
 
   Si INDEX = -1 Alors
-    EcrireFichier 1, "Choix de la grille."
+    # EcrireFichier 1, "Choix de la grille."
     INDEX ← RechercheGrilleAvantageuse(0)
     Si INDEX = -1 Alors
       INDEX ← Entier(Aléa() * 9 + 1)
       TantQue EstGagnée(INDEX)
         INDEX ← Entier(Aléa() * 9 + 1)
       FinTantQue
-      EcrireFichier 1, "Grille aléatoire : " & Chaîne(INDEX)
-    Sinon
-      EcrireFichier 1, "Grille avantageuse : " & Chaîne(INDEX)
+      # EcrireFichier 1, "Grille aléatoire : " & Chaîne(INDEX)
+    # Sinon
+      # EcrireFichier 1, "Grille avantageuse : " & Chaîne(INDEX)
     FinSi
   FinSi
 
@@ -722,8 +739,8 @@ Procédure PlaceCoupOrdinateur()
   CoupsPossibles(candidats, INDEX)
   std:Mélanger(candidats)
 
-  EcrireFichier 1, "*** Evaluation :"
-  EcrireFichier 1, "Coup -> score"
+  # EcrireFichier 1, "*** Evaluation :"
+  # EcrireFichier 1, "Coup -> score"
 
   meilleur ← -1
   scoremax ← -999
@@ -734,15 +751,32 @@ Procédure PlaceCoupOrdinateur()
         scoremax ← score
         meilleur ← candidats[i]
       FinSi
-      EcrireFichier 1, Chaîne(candidats[i]) & " -> " & Chaîne(score)
+      # EcrireFichier 1, Chaîne(candidats[i]) & " -> " & Chaîne(score)
     i Suivant
   FinSi
 
-  EcrireFichier 1, "Fin évaluation ***"
+  # EcrireFichier 1, "Fin évaluation ***"
+
+  term:PosCol(DC)
+  Si scoremax >= 1000 Alors
+    EcrireErr ">>>", JOUEURS[0], "est satisfait..." \
+  SinonSi  scoremax >= 750 Alors
+    EcrireErr ">>>", JOUEURS[0], "est confiant..." \
+  SinonSi scoremax >= 500 Alors
+    EcrireErr ">>>", JOUEURS[0], "est précautionneux..." \
+  SinonSi scoremax >= 250 Alors
+    EcrireErr ">>>", JOUEURS[0], "est prudent..." \
+  SinonSi Aléa() > 0.5 Alors
+    EcrireErr ">>>", JOUEURS[0], "est content..." \
+  Sinon
+    EcrireErr ">>>", JOUEURS[0], "fait de son mieux..." \
+  FinSi
+
+  Dormir(0.5)
 
   COUP ← meilleur
 
-  EcrireFichier 1, "Coup sélectionné (E): " & Chaîne(COUP)
+  # EcrireFichier 1, "Coup sélectionné (E): " & Chaîne(COUP)
 
 FinProcédure
 
@@ -1008,45 +1042,45 @@ Fonction GénèreNomJoueur() en Chaîne
   Retourne nom
 FinFonction
 
-Procédure MachineEcrire(message en Chaîne)
+Procédure MachineEcrire(message en Chaîne, pause en Numérique)
   Variable i en Entier
+  term:CacheCur()
   Pour i ← 1 à Longueur(message)
     Ecrire Extraire(message, i, 1) \
     Dormir(0.00625)
   i Suivant
+  Dormir(pause)
   Ecrire ""
+  term:MontreCur()
 FinProcédure
 
 Début
   Ecrire @PROGRAAMME, "version", @VERSION
-  MachineEcrire(">>> Bienvenue !")
-  Dormir(0.5)
-  MachineEcrire(">>> Eh ?")
-  Dormir(0.5)
-  MachineEcrire(">>> Je vous ai déjà vu quelque part...")
-  Dormir(0.5)
-  MachineEcrire(">>> Mais oui !")
-  Dormir(0.75)
+  MachineEcrire(">>> Bienvenue !", 0.5)
+  MachineEcrire(">>> Eh ?", 0.5)
+  MachineEcrire(">>> Je vous ai déjà vu quelque part...", 0.5)
+  MachineEcrire(">>> Mais oui !", 0.75)
 
-  NOMJOUEUR ← GénèreNomJoueur()
-  JOUEURS ← term:TGR & GénèreNomJoueur() & term:TAGR, term:TGR & NOMJOUEUR & term:TAGR
+  NOMJOUEUR0 ← GénèreNomJoueur()
+  NOMJOUEUR1 ← GénèreNomJoueur()
+  JOUEURS ← term:TGR & NOMJOUEUR0 & term:TAGR, term:TGR & NOMJOUEUR1 & term:TAGR
 
-  MachineEcrire(">>> Bonjour " & JOUEURS[1] & " !")
-  Dormir(1.5)
-  MachineEcrire(">>> Je vous présente votre adversaire : " & JOUEURS[0])
-  Dormir(1.5)
-  MachineEcrire(">>> Le jeu va bientôt commencer...")
-  Dormir(3)
-  MachineEcrire(">>> Début...")
+  MachineEcrire(">>> Bonjour " & JOUEURS[1] & " !", 1.5)
+  MachineEcrire(">>> Je vous présente votre adversaire : " & JOUEURS[0], 1.5)
+  MachineEcrire(">>> Le jeu va bientôt commencer...", 3)
+  Ecrire ">>> Début du match :", dt:Format(TempsUnix(), "%H:%M:%S")
+
+  heuredeb ← TempsUnix()
 
   term:SauveEcran()
+
   SET ← 0
   SETMAX ← 2
   SETS ← -1,-1,-1
   GAGNANT ← -1
   ODC ← 0
 
-  Ouvrir "mmm.log" sur 1 en Ecriture
+  # Ouvrir "mmm-" & std:Minus(NOMJOUEUR0) & ".log" sur 1 en Ecriture
   
   # *** Boucle principale... (Match)
   TantQue NON(VérifieGagnantMatch())
@@ -1113,24 +1147,33 @@ Début
       FinSi
       Dormir(3)
     FinTantQue
+    heurefin ← TempsUnix()
+    duréematch ← Entier(heurefin) - Entier(heuredeb)
     term:EffaceEcran()
     RéafficheCoups()
     DessineGrille()
     term:PosCol(DC)
-    Ecrire JOUEURS[GAGNANT], "gagne le match", ScoreTexte(), "!"
+    Ecrire JOUEURS[GAGNANT], "GAGNE LE MATCH", ScoreTexte(), "en", dt:FormatDuréeSecondes(duréematch), "!"
     Si GAGNANT = 1 Alors
       term:PosCol(DC)
       Ecrire "Félicitations !"
+    Sinon
+      term:PosCol(DC)
+      Ecrire "Vous gagnerez sûrement la prochaine fois,", JOUEURS[1] & "."
     FinSi
     Dormir(3)
-    Fermer 1
+    # Fermer 1
     term:MontreCur()
     term:RestaureEcran()
-    MachineEcrire(">>> Fin.")
+    Ecrire ">>> Fin du match :", dt:Format(heurefin, "%H:%M:%S")
     Si GAGNANT = 1 Alors
-      MachineEcrire(">>> Vous avez gagné, c'est super.")
+      MachineEcrire(">>> Vous avez gagné le match en " & Chaîne(SETMAX) & " sets,", 0.5)
+      MachineEcrire(">>> " & std:Minus(ScoreTexte()) & " en " & dt:FormatDuréeSecondes(duréematch) & ", c'est super.", 0.5)
+      MachineEcrire(">>> " & JOUEURS[0] & " a l'air un peu triste...", 0.5)
     Sinon
-      MachineEcrire(">>> " & JOUEURS[0] & 'a gagné. Sans rancune...')
+      MachineEcrire(">>> " & JOUEURS[0] & " a gagné en " & Chaîne(SETMAX) & " sets, pas mal...", 0.5)
+      MachineEcrire(">>> " & std:Minus(ScoreTexte()) & " en " & dt:FormatDuréeSecondes(duréematch) & "...", 0.5)
+      MachineEcrire(">>> Sans rancune...", 0.5)
     FinSi
-    MachineEcrire(">>> Merci de votre visite " & JOUEURS[1] & ", et à bientôt !")
+    MachineEcrire(">>> Merci de votre visite " & JOUEURS[1] & ", et à bientôt !", 2)
 Fin
