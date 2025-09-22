@@ -177,6 +177,25 @@ Fonction Set() en Chaîne
   Retourne Chaîne(SET) & "ÈME"
 FinFonction
 
+Procédure AfficheJoueurs()
+  Constante MARQUE "▶"
+  Variable joueurs en Chaîne
+
+  joueurs ← ""
+
+  Si JOUEUR = 1 Alors
+   joueurs ← MARQUE
+  FinSi
+  joueurs ← joueurs & NOMJOUEUR1 & " / "
+  Si JOUEUR = 0 Alors
+    joueurs ← joueurs & MARQUE
+  FinSi
+  joueurs ← joueurs & NOMJOUEUR0
+
+  term:PosCol(DC + (28 - Longueur(joueurs) ) / 2)
+  Ecrire joueurs
+FinProcédure
+
 Procédure DessineGrille()
   Variables i, j, k, l en Entier
   Variable C4D en Coord4D
@@ -200,6 +219,7 @@ Procédure DessineGrille()
   term:RappelCur()
   term:PosCol(DC)
   Ecrire "   ", Score(), "| Set", Chaîne(SET) & "/" & Chaîne(SETMAX), "Tour", TOUR
+  AfficheJoueurs()
   term:PosCol(DC)
   Ecrire "    1 2 3   4 5 6   7 8 9"
   term:PosCol(DC)
