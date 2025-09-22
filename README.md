@@ -18,26 +18,8 @@ Pour finir, entrez la commande suivante : `./mmm.algo`
 - Chaque case de cette grande grille contient une **petite grille 3×3** (soit 9 petites grilles au total).
 
 - On joue donc simultanément dans les petites grilles et dans la grande.
-    
-  
-```
-   1 2 3   4 5 6   7 8 9
- ╔═══════╤═══════╤═══════╗
-1║ ∙ ∙ ∙ │ ∙ ∙ ∙ │ ∙ ∙ ∙ ║
-2║ ∙ 1 ∙ │ ∙ 2 ∙ │ ∙ 3 ∙ ║
-3║ ∙ ∙ ∙ │ ∙ ∙ ∙ │ ∙ ∙ ∙ ║
- ╟───────┼───────┼───────╢
-4║ ∙ ∙ ∙ │ ∙ ∙ ∙ │ ∙ ∙ ∙ ║
-5║ ∙ 4 ∙ │ ∙ 5 ∙ │ ∙ 6 ∙ ║
-6║ ∙ ∙ ∙ │ ∙ ∙ ∙ │ ∙ ∙ ∙ ║
- ╟───────┼───────┼───────╢
-7║ ∙ ∙ ∙ │ ∙ ∙ ∙ │ ∙ ∙ ∙ ║
-8║ ∙ 7 ∙ │ ∙ 8 ∙ │ ∙ 9 ∙ ║
-9║ ∙ ∙ ∙ │ ∙ ∙ ∙ │ ∙ ∙ ∙ ║
- ╚═══════╧═══════╧═══════╝
-```
 
----
+![](screenshot.png)
 
 ## 2. Déroulement de la partie
 
