@@ -29,7 +29,7 @@ Pour finir, entrez la commande suivante : `./mmm.algo`
 
 2. **Un tour de jeu**
    
-   - Le joueur place son jeton dans **une case d’une petite grille** en entrant une coordonnée sous la forme :
+   - Le joueur place son jeton dans **une case d’une petite grille** en entrant des coordonnées sous la forme :
      
      - **LC**
        
