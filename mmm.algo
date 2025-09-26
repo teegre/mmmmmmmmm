@@ -1116,84 +1116,84 @@ Début
     Redim COUPS[-1]
     InitialiseGrilles(GRILLES)
 
-      # *** Boucle secondaire... (Set)
-      TantQue NON(VérifieGagnantGrille(JOUEURC, INDEXC, FAUX))
-        term:CacheCur()
-        Si VérifieEgalité() Alors
-          Sortir
-        FinSi
-        Si EstGagnée(INDEX) Alors
-          INDEX ← -1
-        FinSi
-        Si JOUEUR = 0 Alors
-          PlaceCoupOrdinateur()
-        SinonSi JOUEUR = 1 Alors
-          TantQue NON(PlaceCoupJoueur())
-            Dormir(0.5)
-          FinTantQue
-        FinSi
-
-        COORD ← Convertit2D4D(COUP)
-
-        GRILLES[COORD.L1, COORD.L2, COORD.C1, COORD.C2] ← JOUEUR
-        AjouteCoup()
-        TOUR ← TOUR + JOUEUR
-        INDEXC ← IndexGrille(COUP)
-        INDEX ← IndexGrille3x3(COUP)
-        JOUEURC ← JOUEUR
-        JoueurSuivant()
-      FinTantQue
-
-      INDEX ← -1
-      AfficheCoup(-1)
-      DessineGrille()
-      Dormir(1)
-      Si NON(EGALITE) Alors
-        term:PosCol(DC)
-        Ecrire JOUEURS[JOUEURC], "gagne le", Set(),"set !" & term:ANN
-        SETS[SET-1] ← JOUEURC
-        term:PosCol(DC)
-        Ecrire "Le score est de", ScoreTexte()
-      Sinon
-        term:PosCol(DC)
-        Ecrire "Égalité"
-        SETS[SET-1] ← 2
-        term:PosCol(DC)
-        Ecrire "Le score est de", ScoreTexte()
+    # *** Boucle secondaire... (Set)
+    TantQue NON(VérifieGagnantGrille(JOUEURC, INDEXC, FAUX))
+      term:CacheCur()
+      Si VérifieEgalité() Alors
+        Sortir
       FinSi
-      Si NON(VérifieGagnantMatch()) Alors
-        term:PosCol(DC)
-        Ecrire "Le set suivant va débuter..."
+      Si EstGagnée(INDEX) Alors
+        INDEX ← -1
       FinSi
-      Dormir(3)
+      Si JOUEUR = 0 Alors
+        PlaceCoupOrdinateur()
+      SinonSi JOUEUR = 1 Alors
+        TantQue NON(PlaceCoupJoueur())
+          Dormir(0.5)
+        FinTantQue
+      FinSi
+
+      COORD ← Convertit2D4D(COUP)
+
+      GRILLES[COORD.L1, COORD.L2, COORD.C1, COORD.C2] ← JOUEUR
+      AjouteCoup()
+      TOUR ← TOUR + JOUEUR
+      INDEXC ← IndexGrille(COUP)
+      INDEX ← IndexGrille3x3(COUP)
+      JOUEURC ← JOUEUR
+      JoueurSuivant()
     FinTantQue
-    heurefin ← TempsUnix()
-    duréematch ← Entier(heurefin) - Entier(heuredeb)
-    term:EffaceEcran()
-    RéafficheCoups()
+
+    INDEX ← -1
+    AfficheCoup(-1)
     DessineGrille()
-    term:PosCol(DC)
-    Ecrire JOUEURS[GAGNANT], "GAGNE LE MATCH", ScoreTexte(), "en", dt:FormatDuréeSecondes(duréematch), "!"
-    Si GAGNANT = 1 Alors
+    Dormir(1)
+    Si NON(EGALITE) Alors
       term:PosCol(DC)
-      Ecrire "Félicitations !"
+      Ecrire JOUEURS[JOUEURC], "gagne le", Set(),"set !" & term:ANN
+      SETS[SET-1] ← JOUEURC
+      term:PosCol(DC)
+      Ecrire "Le score est de", ScoreTexte()
     Sinon
       term:PosCol(DC)
-      Ecrire "Vous gagnerez sûrement la prochaine fois,", JOUEURS[1] & "."
+      Ecrire "Égalité"
+      SETS[SET-1] ← 2
+      term:PosCol(DC)
+      Ecrire "Le score est de", ScoreTexte()
+    FinSi
+    Si NON(VérifieGagnantMatch()) Alors
+      term:PosCol(DC)
+      Ecrire "Le set suivant va débuter..."
     FinSi
     Dormir(3)
-    # Fermer 1
-    term:MontreCur()
-    term:RestaureEcran()
-    Ecrire ">>> Fin du match :", dt:Format(heurefin, "%H:%M:%S")
-    Si GAGNANT = 1 Alors
-      MachineEcrire(">>> Vous avez gagné le match en " & Chaîne(SETMAX) & " sets,", 0.5)
-      MachineEcrire(">>> " & std:Minus(ScoreTexte()) & " en " & dt:FormatDuréeSecondes(duréematch) & ", c'est super.", 0.5)
-      MachineEcrire(">>> " & JOUEURS[0] & " a l'air un peu triste...", 0.5)
-    Sinon
-      MachineEcrire(">>> " & JOUEURS[0] & " a gagné en " & Chaîne(SETMAX) & " sets, pas mal...", 0.5)
-      MachineEcrire(">>> " & std:Minus(ScoreTexte()) & " en " & dt:FormatDuréeSecondes(duréematch) & "...", 0.5)
-      MachineEcrire(">>> Sans rancune...", 0.5)
-    FinSi
-    MachineEcrire(">>> Merci de votre visite " & JOUEURS[1] & ", et à bientôt !", 2)
+  FinTantQue
+  heurefin ← TempsUnix()
+  duréematch ← Entier(heurefin) - Entier(heuredeb)
+  term:EffaceEcran()
+  RéafficheCoups()
+  DessineGrille()
+  term:PosCol(DC)
+  Ecrire JOUEURS[GAGNANT], "GAGNE LE MATCH", ScoreTexte(), "en", dt:FormatDuréeSecondes(duréematch), "!"
+  Si GAGNANT = 1 Alors
+    term:PosCol(DC)
+    Ecrire "Félicitations !"
+  Sinon
+    term:PosCol(DC)
+    Ecrire "Vous gagnerez sûrement la prochaine fois,", JOUEURS[1] & "."
+  FinSi
+  Dormir(3)
+  # Fermer 1
+  term:MontreCur()
+  term:RestaureEcran()
+  Ecrire ">>> Fin du match :", dt:Format(heurefin, "%H:%M:%S")
+  Si GAGNANT = 1 Alors
+    MachineEcrire(">>> Vous avez gagné le match en " & Chaîne(SETMAX) & " sets,", 0.5)
+    MachineEcrire(">>> " & std:Minus(ScoreTexte()) & " en " & dt:FormatDuréeSecondes(duréematch) & ", c'est super.", 0.5)
+    MachineEcrire(">>> " & JOUEURS[0] & " a l'air un peu triste...", 0.5)
+  Sinon
+    MachineEcrire(">>> " & JOUEURS[0] & " a gagné en " & Chaîne(SETMAX) & " sets, pas mal...", 0.5)
+    MachineEcrire(">>> " & std:Minus(ScoreTexte()) & " en " & dt:FormatDuréeSecondes(duréematch) & "...", 0.5)
+    MachineEcrire(">>> Sans rancune...", 0.5)
+  FinSi
+  MachineEcrire(">>> Merci de votre visite " & JOUEURS[1] & ", et à bientôt !", 2)
 Fin
